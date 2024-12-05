@@ -1,0 +1,8 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dirs = "5.0.1"
+regex = "1.11.1"
