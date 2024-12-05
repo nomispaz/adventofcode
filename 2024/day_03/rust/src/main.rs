@@ -3,6 +3,7 @@ use regex::Regex;
 use std::fs::read_to_string;
 
 fn resolve_home(old_path: String) -> String {
+//! used to reslve the home-path of the input-directory
     //if path of config-file contains ~ or $HOME, parse to the real home dir
     let home_dir: String = home_dir().unwrap().display().to_string();
 
@@ -20,7 +21,7 @@ fn resolve_home(old_path: String) -> String {
 }
 
 fn collect_muls(contents: String) -> (String, String) {
- 
+//! helper function to split the string at don't and do and return the string-parts
     // split until do_not is found
     // match is needed to capture if the result of split is None. happens then don't() is not found
     // any more
@@ -39,7 +40,9 @@ fn collect_muls(contents: String) -> (String, String) {
 }
 
 fn sum_muls(contents: &str) -> u64 {
-    
+//! sum the mul-entries
+    // via regex, get all entries that start with mul(, contain a sequence of numbers, followed by
+    // a comma, again a sequence of numbers and ends with a ).
     let re = Regex::new(r"mul\([0-9]*,[0-9]*\)").unwrap();
     let mut sum: u64 = 0;
 
@@ -49,6 +52,7 @@ fn sum_muls(contents: &str) -> u64 {
         .collect();
 
     for entry in entries {
+        // extract only the numbers from the mul-entries
         let entry: Vec<u64> = entry
             .replace("mul(", "")
             .replace(")", "")
