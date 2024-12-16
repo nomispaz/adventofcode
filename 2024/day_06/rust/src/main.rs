@@ -1,4 +1,3 @@
-use core::panic;
 use dirs::home_dir;
 use std::fs::read_to_string;
 
