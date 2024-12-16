@@ -2,7 +2,7 @@ use core::panic;
 use dirs::home_dir;
 use std::fs::read_to_string;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 enum Direction {
     N,
     E,
@@ -11,7 +11,7 @@ enum Direction {
     None,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 struct VisitedLocation {
     line_idx: i64,
     entry_idx: i64,
@@ -34,7 +34,7 @@ fn is_obstacle(entry: char, direction: Direction) -> (Direction, bool) {
 }
 
 fn guard_move(
-    contents: &Vec<String>,
+    contents: &Vec<Vec<char>>,
     next_line_idx: i64,
     next_entry_idx: i64,
     direction: Direction,
@@ -42,53 +42,42 @@ fn guard_move(
     let mut direction = direction;
     let hit_obstacle: bool;
     // only continue,if not out-of-bounds
-    if next_line_idx >= 0 && next_entry_idx >= 0 {
-        match contents.get(next_line_idx as usize) {
-            Some(line) => {
-                match line.chars().nth(next_entry_idx as usize) {
-                    Some(entry) => {
-                        // we are still in the field --> check if next line is an obstacle
-                        (direction, hit_obstacle) = is_obstacle(entry, direction);
-                        return (direction, false, hit_obstacle);
-                    }
-                    // Out of bounds on the right --> the guard left
-                    None => return (direction, true, false),
-                }
-            }
-            // Out of bounds on the bottom --> the guard left
-            None => return (direction, true, false),
-        }
+    if next_line_idx >= 0 && next_entry_idx >= 0 && contents.len() > next_line_idx as usize && contents[0].len() > next_entry_idx as usize {
+        // we are still in the field --> check if next line is an obstacle
+        (direction, hit_obstacle) = is_obstacle(contents[next_line_idx as usize][next_entry_idx as usize], direction);
+        return (direction, false, hit_obstacle);
     } else {
         // Out of bounds on left or top --> the guard left
         return (direction, true, false);
     }
 }
 
-fn create_location(
+fn create_turn_point(
     line_idx: i64,
     entry_idx: i64,
     direction: Direction,
-    visited_locations: Vec<(VisitedLocation, Direction)>,
+    visited_turn_points: Vec<(VisitedLocation, Direction)>,
 ) -> (Vec<(VisitedLocation, Direction)>, bool) {
-    let mut visited_locations = visited_locations;
+    let mut visited_turn_points = visited_turn_points;
     let mut visited_twice: bool = false;
     let location = VisitedLocation {
         line_idx: line_idx,
         entry_idx: entry_idx,
     };
 
-    for l in &visited_locations {
+    for l in &visited_turn_points {
         if l.0 == location && l.1 == direction {
             visited_twice = true;
             break;
         }
     }
 
-    visited_locations.push((location, direction));
-    return (visited_locations, visited_twice);
+    visited_turn_points.push((location, direction));
+
+    return (visited_turn_points, visited_twice);
 }
 
-fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut current_entry_idx: i64, mut guard_facing: Direction) -> (Vec<String>, Vec<(VisitedLocation, Direction)>, bool) {
+fn simulate_guard(mut contents: Vec<Vec<char>>, mut current_line_idx: i64, mut current_entry_idx: i64, mut guard_facing: Direction, update_contents: bool) -> (Vec<Vec<char>>, Vec<(VisitedLocation, Direction)>, bool) {
     let mut guard_left = false;
     let mut next_line_idx: i64;
     let mut next_entry_idx: i64;
@@ -97,32 +86,11 @@ fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut curr
     let mut visited_twice: bool = false;
    
     // continue until the guard left
-    let mut number_locations = 0;
     while !guard_left {
-        number_locations += 1;
-        
-        if let Some(line) = contents.get_mut(current_line_idx as usize) {
-            let mut entries: Vec<char> = line.chars().collect();
-            entries[current_entry_idx as usize] = 'X';
-            // Convert back to a String
-            *line = entries.into_iter().collect();
-
-            // create location for part 2
-            (visited_locations, visited_twice) = create_location(
-                current_line_idx as i64,
-                current_entry_idx,
-                guard_facing.clone(),
-                visited_locations,
-            );
-            // visited_twice can only be true when a loop was found. This shouldn't happen in part
-            // 1, so it is ok to break the loop when this happens for part 1 and necessary for part
-            // 2.
-            if visited_twice {
-                break;
-            }
-        }
+     
         next_line_idx = current_line_idx as i64;
         next_entry_idx = current_entry_idx;
+
         match guard_facing {
             Direction::N => {
                 next_line_idx += -1;
@@ -148,22 +116,48 @@ fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut curr
             next_entry_idx,
             guard_facing,
         );
+
+        // make sure that we are not out-of-bounds
+        if current_line_idx >= 0 && current_entry_idx >= 0 && contents.len() > current_line_idx as usize && contents[0].len() > current_entry_idx as usize {
+
+            if update_contents {
+                contents[current_line_idx as usize][current_entry_idx as usize] = 'X';
+            }
+
+            // create location for part 2 if the guard turns
+            if reached_obstacle {
+                (visited_locations, visited_twice) = create_turn_point(
+                    current_line_idx as i64,
+                    current_entry_idx,
+                    guard_facing.clone(),
+                    visited_locations,
+                );
+            }
+            // visited_twice can only be true when a loop was found. This shouldn't happen in part
+            // 1, so it is ok to break the loop when this happens for part 1 and necessary for part
+            // 2.
+            if visited_twice {
+                break;
+            }
+        }
+
+
         if !reached_obstacle {
             current_entry_idx = next_entry_idx;
             current_line_idx = next_line_idx;
         }
+
         // println!("guard is facing: {:?}, entry {}, line {}", guard_facing, current_entry_idx, current_line_idx)
     }
     return (contents, visited_locations, visited_twice);
 }
 
-fn create_obstacle(mut contents: Vec<String>, location: &VisitedLocation) -> Vec<String> {
-    if let Some(line) = contents.get_mut(location.line_idx as usize) {
-        let mut entries: Vec<char> = line.chars().collect();
-        entries[location.entry_idx as usize] = '#';
-        // Convert back to a String
-        *line = entries.into_iter().collect();
+fn create_obstacle(mut contents: Vec<Vec<char>>, location: &VisitedLocation) -> Vec<Vec<char>> {
+    // make sure that we are not out-of-bounds
+    if location.line_idx >= 0 && location.entry_idx >= 0 && contents.len() > location.line_idx as usize && contents[0].len() > location.entry_idx as usize {
+    contents[location.line_idx as usize][location.entry_idx as usize] = '#';
     }
+
     return contents;
 }
 
@@ -179,6 +173,9 @@ fn main() {
     .filter(|s| !s.trim().is_empty())
     .collect();
 
+    // create a matrix out of the input
+    let contents_map: Vec<Vec<char>> = contents.clone().into_iter().map(|s|s.chars().collect()).collect();
+
     let mut guard_facing = Direction::None;
     let mut current_line_idx = 0;
     let mut current_entry_idx = 0;
@@ -192,11 +189,11 @@ fn main() {
 
     // first search for position of the guard and the direction he is facing
     for facing_direction in vec!["^", "v", ">", "<"] {
-        for (line_number, line) in contents.iter().enumerate() {
-            match line.find(facing_direction) {
-                Some(_) => {
+        for line_number in 0..contents_map.len() {
+            match contents[line_number].find(facing_direction) {
+                Some(entry_number) => {
                     current_line_idx = line_number;
-                    current_entry_idx = line.find(facing_direction).unwrap() as i64;
+                    current_entry_idx = entry_number as i64;
                     initial_location = VisitedLocation {
                         line_idx: current_line_idx as i64,
                         entry_idx: current_entry_idx,
@@ -217,21 +214,21 @@ fn main() {
     // stop, if no initial direction was not found:
     match guard_facing {
         Direction::None => panic!("No initial direction was found."),
-        _ => println!("Initial_location: {:?}", initial_location),
+        _ => println!("Initial_location: {:?}, initial direction: {:?}", initial_location, guard_facing),
     }
 
     // at this point, the initial direction, entry and line was found and saved
     // visited_locations necessary for part 2
-    let (modified_contents, _, _) = simulate_guard(contents.clone(), current_line_idx as i64, current_entry_idx, guard_facing.clone());
+    let (modified_contents, _, _) = simulate_guard(contents_map.clone(), current_line_idx as i64, current_entry_idx, guard_facing.clone(), true);
 
-    let mut visited_locations: Vec<(VisitedLocation)> = vec![];
+    let mut visited_turn_points: Vec<VisitedLocation> = vec![];
 
-    for (line_number, line) in modified_contents.iter().enumerate() {
-        for (entry_number, entry) in line.chars().enumerate() {
-            if entry == 'X' {
+    for line_number in 0..modified_contents.len() {
+        for entry_number in 0..modified_contents[line_number].len() {
+            if modified_contents[line_number][entry_number] == 'X' {
                 number_positions += 1;
-                visited_locations.push(VisitedLocation { line_idx: line_number as i64, entry_idx: entry_number as i64 });
-            }
+                visited_turn_points.push(VisitedLocation { line_idx: line_number as i64, entry_idx: entry_number as i64 });
+              }
         }
     }
 
@@ -248,20 +245,18 @@ fn main() {
 
     let mut number_loop_possibilities = 0;
 
-    
-
     // go through all locations visited in the standard run without additional obstacles
-    for location in &visited_locations {
-       
+    for location in &visited_turn_points {
+      
         match &location {
             // deference and compare to initial_location so that the variable is used
             // if only match initial_location ist used, rust interprets this as a new variable in
             // the match scope
             l if **l != initial_location => {
                 // we are not at the starting position --> create obstacle at this point
-                let modified_contents = create_obstacle(contents.clone(), &l);
+                let modified_contents = create_obstacle(contents_map.clone(), &l);
 
-                let (_, _, visited_twice) = simulate_guard(modified_contents, current_line_idx as i64, current_entry_idx, guard_facing.clone());
+                let (_, _, visited_twice) = simulate_guard(modified_contents, current_line_idx as i64, current_entry_idx, guard_facing.clone(), false);
                 if visited_twice {
                     number_loop_possibilities += 1;
                 }

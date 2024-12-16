@@ -1,8 +1,8 @@
 use core::panic;
 use dirs::home_dir;
-use std::{collections::HashMap, fs::read_to_string};
+use std::fs::read_to_string;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 enum Direction {
     N,
     E,
@@ -11,7 +11,7 @@ enum Direction {
     None,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 struct VisitedLocation {
     line_idx: i64,
     entry_idx: i64,
@@ -77,42 +77,41 @@ fn create_location(
         entry_idx: entry_idx,
     };
 
-    for l in visited_locations {
+    for l in &visited_locations {
         if l.0 == location && l.1 == direction {
             visited_twice = true;
+            break;
         }
     }
 
-        if visited_locations. (&location) {
-            let location_already_visited = visited_locations.get(&location).unwrap();
-            if *location_already_visited == direction {
-                visited_twice = true;
-            }
-        }    
+    visited_locations.push((location, direction));
+    let find_duplicates = visited_locations.len();
+
+    if find_duplicates > visited_locations.len() {
+        visited_twice = true;
     }
 
-    visited_locations.insert(location, direction);
     return (visited_locations, visited_twice);
 }
 
-fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut current_entry_idx: i64, mut guard_facing: Direction) -> (Vec<String>, HashMap<VisitedLocation, Direction>, bool) {
+fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut current_entry_idx: i64, mut guard_facing: Direction, update_contents: bool) -> (Vec<String>, Vec<(VisitedLocation, Direction)>, bool) {
     let mut guard_left = false;
     let mut next_line_idx: i64;
     let mut next_entry_idx: i64;
     let mut reached_obstacle: bool;
-    let mut visited_locations: HashMap<VisitedLocation, Direction> = HashMap::new();
+    let mut visited_locations: Vec<(VisitedLocation, Direction)> = vec![];
     let mut visited_twice: bool = false;
    
     // continue until the guard left
-    let mut number_locations = 0;
     while !guard_left {
-        number_locations += 1;
         
         if let Some(line) = contents.get_mut(current_line_idx as usize) {
-            let mut entries: Vec<char> = line.chars().collect();
-            entries[current_entry_idx as usize] = 'X';
-            // Convert back to a String
-            *line = entries.into_iter().collect();
+            if update_contents {
+                let mut entries: Vec<char> = line.chars().collect();
+                entries[current_entry_idx as usize] = 'X';
+                // Convert back to a String
+                *line = entries.into_iter().collect();
+            }
 
             // create location for part 2
             (visited_locations, visited_twice) = create_location(
@@ -127,13 +126,6 @@ fn simulate_guard(mut contents: Vec<String>, mut current_line_idx: i64, mut curr
             if visited_twice {
                 break;
             }
-        }
-        // TODO: remove after visited locations was changed to vec<(VisitedLocation, Direction)>
-        if number_locations > 10000 {
-            for line in &contents {
-                println!("{line}");
-            }
-            break;
         }
         next_line_idx = current_line_idx as i64;
         next_entry_idx = current_entry_idx;
@@ -236,12 +228,15 @@ fn main() {
 
     // at this point, the initial direction, entry and line was found and saved
     // visited_locations necessary for part 2
-    let (modified_contents, visited_locations, _) = simulate_guard(contents.clone(), current_line_idx as i64, current_entry_idx, guard_facing.clone());
+    let (modified_contents, _, _) = simulate_guard(contents.clone(), current_line_idx as i64, current_entry_idx, guard_facing.clone(), true);
 
-    for line in &modified_contents {
-        for entry in line.chars() {
+    let mut visited_locations: Vec<(VisitedLocation)> = vec![];
+
+    for (line_number, line) in modified_contents.iter().enumerate() {
+        for (entry_number, entry) in line.chars().enumerate() {
             if entry == 'X' {
                 number_positions += 1;
+                visited_locations.push(VisitedLocation { line_idx: line_number as i64, entry_idx: entry_number as i64 });
             }
         }
     }
@@ -259,22 +254,21 @@ fn main() {
 
     let mut number_loop_possibilities = 0;
 
+    let mut loop_conter = 0;
     // go through all locations visited in the standard run without additional obstacles
-    let mut loop_counter = 1;
     for location in &visited_locations {
-        println!("Loop counter: {loop_counter}");
-        loop_counter += 1;
-        
-        match location.0 {
+        loop_conter += 1;
+        println!("{loop_conter}");
+       
+        match &location {
             // deference and compare to initial_location so that the variable is used
             // if only match initial_location ist used, rust interprets this as a new variable in
             // the match scope
-            l if *l != initial_location => {
-                println!("{:?}", location);
+            l if **l != initial_location => {
                 // we are not at the starting position --> create obstacle at this point
-                let modified_contents = create_obstacle(contents.clone(), l);
+                let modified_contents = create_obstacle(contents.clone(), &l);
 
-                let (_, _, visited_twice) = simulate_guard(modified_contents, current_line_idx as i64, current_entry_idx, guard_facing.clone());
+                let (_, _, visited_twice) = simulate_guard(modified_contents, current_line_idx as i64, current_entry_idx, guard_facing.clone(), false);
                 if visited_twice {
                     number_loop_possibilities += 1;
                 }
