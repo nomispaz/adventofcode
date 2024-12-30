@@ -162,7 +162,7 @@ fn create_obstacle(mut contents: Vec<Vec<char>>, location: &VisitedLocation) -> 
 
 fn main() {
     let contents: Vec<String> = read_to_string(format!(
-        "{}/git_repos/adventofcode/2024/day_06/rust/src/input.txt",
+        "{}/git_repos/adventofcode/2024/day_06/rust/src/test_input.txt",
         home_dir().unwrap().display().to_string()
     ))
     .unwrap()
