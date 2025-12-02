@@ -196,7 +196,7 @@ fn search_mas(
 
 fn main() {
     let contents: Vec<String> = read_to_string(resolve_home(
-        "~/git_repos/adventofcode/2024/day_04/rust/src/input.txt".to_string(),
+        "/mnt/nvme2/git_repos/adventofcode/2024/day_04/rust/src/input.txt".to_string(),
     ))
     .unwrap()
     .split("\n")

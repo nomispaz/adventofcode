@@ -22,7 +22,7 @@ func main()  {
 
 	// get lines of file
 	contents_split := strings.Split(contents, "\n")
-
+	
 	var col1 []int
 	var col2 []int
 

@@ -100,9 +100,7 @@ fn is_safe_with_dampener(values: Vec<i64>, values_removed: u8) -> u64 {
 fn main() {
 
     // read input to vector of strings, remove empty rows
-    let contents: Vec<String> = read_to_string(resolve_home(
-        "~/Documents/aoc/2024/day_02/rust/src/input.txt".to_string(),
-    ))
+    let contents: Vec<String> = read_to_string("/mnt/nvme2/git_repos/adventofcode/2024/day_02/rust/src/input.txt".to_string())
     .unwrap()
     .split("\n")
     .filter(|s| !s.trim().is_empty())
